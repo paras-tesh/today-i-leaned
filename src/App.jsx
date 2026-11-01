@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import "./style.css";
-import { supabase } from "./supabaseClient";
 
+import { supabase, FACTS_URL, apiHeaders } from "./supabaseClient";
 import Header from "./components/Header.jsx";
 import NewFactForm from "./components/NewFactForm.jsx";
 import CategoryFilter from "./components/CategoryFilter.jsx";
 import FactList from "./components/FactList.jsx";
 import Login from "./components/Login.jsx";
-
-const SUPABASE_URL = "https://axeoeumxspzlcctwrmvg.supabase.co/rest/v1/facts";
-const SUPABASE_KEY = "sb_publishable_6ckZ0wXxF2GE3VUOOLJhVQ_iKo1IgeV";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -19,6 +16,8 @@ function App() {
   const [currentCategory, setCurrentCategory] = useState("all");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Restore an existing session on load and keep listening for
+  // login / logout / token refresh while the app is open.
   useEffect(function () {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -34,30 +33,36 @@ function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Load facts whenever the category changes (only when logged in).
   useEffect(
     function () {
       if (!session) return;
 
+      let ignore = false; // avoids showing stale results after a fast category switch
+
       async function getFacts() {
         setIsLoading(true);
 
-        let query = `${SUPABASE_URL}?select=*`;
+        let query = `${FACTS_URL}?select=*&order=id.desc`;
         if (currentCategory !== "all") {
           query += `&category=eq.${currentCategory}`;
         }
 
-        const res = await fetch(query, {
-          headers: {
-            apikey: SUPABASE_KEY,
-            authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        });
-        const data = await res.json();
-
-        setFacts(data);
-        setIsLoading(false);
+        try {
+          const res = await fetch(query, { headers: apiHeaders });
+          const data = await res.json();
+          if (!ignore) setFacts(Array.isArray(data) ? data : []);
+        } catch {
+          if (!ignore) setFacts([]);
+        } finally {
+          if (!ignore) setIsLoading(false);
+        }
       }
       getFacts();
+
+      return () => {
+        ignore = true;
+      };
     },
     [currentCategory, session],
   );
@@ -67,14 +72,17 @@ function App() {
 
   return (
     <>
-      <Header showForm={showForm} setShowForm={setShowForm} session={session} />
+      <Header showForm={showForm} setShowForm={setShowForm} />
 
       {showForm ? (
         <NewFactForm setFacts={setFacts} setShowForm={setShowForm} />
       ) : null}
 
       <main className="main">
-        <CategoryFilter setCurrentCategory={setCurrentCategory} />
+        <CategoryFilter
+          currentCategory={currentCategory}
+          setCurrentCategory={setCurrentCategory}
+        />
         {isLoading ? (
           <p className="message">Loading...</p>
         ) : (

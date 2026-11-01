@@ -1,25 +1,12 @@
 import { useState } from "react";
 import { CATEGORIES } from "../data";
-
-const SUPABASE_URL = "https://axeoeumxspzlcctwrmvg.supabase.co/rest/v1/facts";
-const SUPABASE_KEY = "sb_publishable_6ckZ0wXxF2GE3VUOOLJhVQ_iKo1IgeV";
-
-const VOTE_TYPES = [
-  { key: "votesInteresting", emoji: "👍" },
-  { key: "votesMindblowing", emoji: "🤯" },
-  { key: "votesFalse", emoji: "⛔️" },
-];
-
-async function supabaseRequest(id, options) {
-  const res = await fetch(`${SUPABASE_URL}?id=eq.${id}`, options);
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
-  return res;
-}
+import { FACTS_URL, apiHeaders } from "../supabaseClient";
 
 function Fact({ fact, setFacts }) {
   const isDisputed =
     fact.votesInteresting + fact.votesMindblowing < fact.votesFalse;
 
+  // Which vote (if any) this browser already cast for this fact
   const [votedType, setVotedType] = useState(() =>
     localStorage.getItem(`voted-${fact.id}`),
   );
@@ -29,24 +16,29 @@ function Fact({ fact, setFacts }) {
     if (isVoting) return;
     setIsVoting(true);
 
-    const updates = {
-      [columnName]: fact[columnName] + (votedType === columnName ? -1 : 1),
-    };
-    if (votedType && votedType !== columnName) {
-      updates[votedType] = fact[votedType] - 1;
+    const updates = {};
+
+    if (votedType === columnName) {
+      // Same emoji clicked again -> remove the vote
+      updates[columnName] = fact[columnName] - 1;
+    } else {
+      // Switching vote -> remove the old one, add the new one
+      if (votedType) updates[votedType] = fact[votedType] - 1;
+      updates[columnName] = fact[columnName] + 1;
     }
 
     try {
-      const res = await supabaseRequest(fact.id, {
+      const res = await fetch(`${FACTS_URL}?id=eq.${fact.id}`, {
         method: "PATCH",
         headers: {
+          ...apiHeaders,
           "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          authorization: `Bearer ${SUPABASE_KEY}`,
           Prefer: "return=representation",
         },
         body: JSON.stringify(updates),
       });
+
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
 
       const [updatedFact] = await res.json();
       setFacts((facts) =>
@@ -55,9 +47,12 @@ function Fact({ fact, setFacts }) {
 
       const newVote = votedType === columnName ? null : columnName;
       setVotedType(newVote);
-      newVote
-        ? localStorage.setItem(`voted-${fact.id}`, newVote)
-        : localStorage.removeItem(`voted-${fact.id}`);
+
+      if (newVote) {
+        localStorage.setItem(`voted-${fact.id}`, newVote);
+      } else {
+        localStorage.removeItem(`voted-${fact.id}`);
+      }
     } catch (err) {
       alert(`Failed to update vote: ${err.message}`);
     } finally {
@@ -68,24 +63,26 @@ function Fact({ fact, setFacts }) {
   async function handleDelete() {
     if (!window.confirm("Delete this fact?")) return;
 
-    try {
-      await supabaseRequest(fact.id, {
-        method: "DELETE",
-        headers: {
-          apikey: SUPABASE_KEY,
-          authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-      });
+    const res = await fetch(`${FACTS_URL}?id=eq.${fact.id}`, {
+      method: "DELETE",
+      headers: apiHeaders,
+    });
+
+    if (res.ok) {
       setFacts((facts) => facts.filter((f) => f.id !== fact.id));
-    } catch (err) {
-      alert(`Failed to delete the fact: ${err.message}`);
+    } else {
+      alert("Failed to delete the fact.");
     }
+  }
+
+  function voteButtonStyle(type) {
+    return votedType === type ? { outline: "2px solid #fafaf9" } : undefined;
   }
 
   return (
     <li className="fact">
       <p>
-        {isDisputed && <span className="disputed">[⛔️ DISPUTED]</span>}
+        {isDisputed ? <span className="disputed">[⛔️ DISPUTED]</span> : null}
         {fact.text}
         <a
           className="source"
@@ -96,10 +93,11 @@ function Fact({ fact, setFacts }) {
           (Source)
         </a>
       </p>
+
       <span
         className="tag"
         style={{
-          backgroundColor: CATEGORIES.find((c) => c.name === fact.category)
+          backgroundColor: CATEGORIES.find((cat) => cat.name === fact.category)
             ?.color,
         }}
       >
@@ -107,16 +105,27 @@ function Fact({ fact, setFacts }) {
       </span>
 
       <div className="vote-buttons">
-        {VOTE_TYPES.map(({ key, emoji }) => (
-          <button
-            key={key}
-            onClick={() => handleVote(key)}
-            disabled={isVoting}
-            className={votedType === key ? "voted" : ""}
-          >
-            {emoji} {fact[key]}
-          </button>
-        ))}
+        <button
+          onClick={() => handleVote("votesInteresting")}
+          disabled={isVoting}
+          style={voteButtonStyle("votesInteresting")}
+        >
+          👍 {fact.votesInteresting}
+        </button>
+        <button
+          onClick={() => handleVote("votesMindblowing")}
+          disabled={isVoting}
+          style={voteButtonStyle("votesMindblowing")}
+        >
+          🤯 {fact.votesMindblowing}
+        </button>
+        <button
+          onClick={() => handleVote("votesFalse")}
+          disabled={isVoting}
+          style={voteButtonStyle("votesFalse")}
+        >
+          ⛔️ {fact.votesFalse}
+        </button>
         <button onClick={handleDelete}>🗑️ Delete</button>
       </div>
     </li>

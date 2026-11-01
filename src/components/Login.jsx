@@ -1,17 +1,10 @@
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
 
-const inputStyle = { width: "100%", maxWidth: "none" };
-const linkButtonStyle = {
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,10 +22,14 @@ function Login() {
 
     setIsLoading(false);
 
-    if (error) return setError(error.message);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
     if (isSignup) {
       setMessage(
-        "Account created! Check your email to confirm it, then log in.",
+        "Account created! If email confirmation is enabled, check your inbox.",
       );
     }
   }
@@ -45,54 +42,50 @@ function Login() {
 
   return (
     <div className="container">
-      <div
-        className="logo"
-        style={{ justifyContent: "center", marginBottom: 40 }}
-      >
+      <div className="logo login-logo">
         <img src="/logo.png" alt="Today I Learned logo" />
         <h1>Today I Learned!</h1>
       </div>
 
-      <form
-        className="fact-form"
-        style={{ flexDirection: "column", maxWidth: 400, margin: "0 auto" }}
-        onSubmit={handleSubmit}
-      >
-        <h2 style={{ marginBottom: 8 }}>
-          {isSignup ? "Create an account" : "Log in"}
-        </h2>
+      <form className="fact-form login-form" onSubmit={handleSubmit}>
+        <h2>{isSignup ? "Create an account" : "Log in"}</h2>
 
         <input
           type="email"
           placeholder="Email"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
-          style={inputStyle}
         />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
-          style={inputStyle}
-        />
+        <div className="password-field">
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            autoComplete={isSignup ? "new-password" : "current-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+          />
+          <button
+            type="button"
+            className="btn-eye"
+            onClick={() => setShowPassword((show) => !show)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? "🙈" : "👁️"}
+          </button>
+        </div>
 
         <button className="btn btn-large" disabled={isLoading}>
           {isLoading ? "Please wait..." : isSignup ? "Sign up" : "Log in"}
         </button>
 
-        {error && <p className="form-error">{error}</p>}
-        {message && <p className="form-success">{message}</p>}
+        {error ? <p className="form-error">{error}</p> : null}
+        {message ? <p className="form-success">{message}</p> : null}
 
-        <button
-          type="button"
-          onClick={toggleMode}
-          className="link-button"
-          style={linkButtonStyle}
-        >
+        <button type="button" className="btn-link" onClick={toggleMode}>
           {isSignup
             ? "Already have an account? Log in"
             : "Don't have an account? Sign up"}

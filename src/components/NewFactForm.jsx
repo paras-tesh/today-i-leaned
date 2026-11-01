@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { CATEGORIES } from "../data";
+import { FACTS_URL, apiHeaders } from "../supabaseClient";
 
-const SUPABASE_URL = "https://axeoeumxspzlcctwrmvg.supabase.co/rest/v1/facts";
-const SUPABASE_KEY = "sb_publishable_6ckZ0wXxF2GE3VUOOLJhVQ_iKo1IgeV";
+const MAX_LENGTH = 200;
 
 function isValidHttpUrl(string) {
   let url;
   try {
     url = new URL(string);
-  } catch (_) {
+  } catch {
     return false;
   }
   return url.protocol === "http:" || url.protocol === "https:";
@@ -31,8 +31,8 @@ function NewFactForm({ setFacts, setShowForm }) {
       setError("Fact text can't be empty.");
       return;
     }
-    if (textLength > 200) {
-      setError("Text can't be longer than 200 characters.");
+    if (textLength > MAX_LENGTH) {
+      setError(`Text can't be longer than ${MAX_LENGTH} characters.`);
       return;
     }
     if (!isValidHttpUrl(source)) {
@@ -47,12 +47,11 @@ function NewFactForm({ setFacts, setShowForm }) {
     setIsUploading(true);
 
     try {
-      const res = await fetch(SUPABASE_URL, {
+      const res = await fetch(FACTS_URL, {
         method: "POST",
         headers: {
+          ...apiHeaders,
           "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          authorization: `Bearer ${SUPABASE_KEY}`,
           Prefer: "return=representation",
         },
         body: JSON.stringify({ text, source, category }),
@@ -86,7 +85,7 @@ function NewFactForm({ setFacts, setShowForm }) {
         onChange={(e) => setText(e.target.value)}
         disabled={isUploading}
       />
-      <span>{200 - textLength}</span>
+      <span>{MAX_LENGTH - textLength}</span>
       <input
         type="text"
         placeholder="Trustworthy source..."
@@ -109,7 +108,7 @@ function NewFactForm({ setFacts, setShowForm }) {
       <button className="btn btn-large" disabled={isUploading}>
         {isUploading ? "Posting..." : "Post"}
       </button>
-      {error ? <p style={{ color: "#ef4444", width: "100%" }}>{error}</p> : null}
+      {error ? <p className="form-error">{error}</p> : null}
     </form>
   );
 }
