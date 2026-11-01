@@ -1,88 +1,48 @@
-import { useEffect, useState } from "react";
-import "./style.css";
-import { supabase } from "./supabaseClient";
+import { useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
+import Footer from './components/Footer.jsx'
+import Header from './components/Header.jsx'
+import MediaModal from './components/MediaModal.jsx'
+import Toast from './components/Toast.jsx'
+import useContentGuard from './hooks/useContentGuard.js'
+import About from './pages/About.jsx'
+import Admin from './pages/admin/Admin.jsx'
+import Blog from './pages/Blog.jsx'
+import Cart from './pages/Cart.jsx'
+import Contact from './pages/Contact.jsx'
+import Course from './pages/Course.jsx'
+import Courses from './pages/Courses.jsx'
+import Home from './pages/Home.jsx'
+import Login from './pages/Login.jsx'
+import Panel from './pages/Panel.jsx'
 
-import Header from "./components/Header.jsx";
-import NewFactForm from "./components/NewFactForm.jsx";
-import CategoryFilter from "./components/CategoryFilter.jsx";
-import FactList from "./components/FactList.jsx";
-import Login from "./components/Login.jsx";
+export default function App() {
+  const { pathname } = useLocation()
+  useContentGuard()
 
-const SUPABASE_URL = "https://axeoeumxspzlcctwrmvg.supabase.co/rest/v1/facts";
-const SUPABASE_KEY = "sb_publishable_6ckZ0wXxF2GE3VUOOLJhVQ_iKo1IgeV";
-
-function App() {
-  const [session, setSession] = useState(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [facts, setFacts] = useState([]);
-  const [currentCategory, setCurrentCategory] = useState("all");
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(function () {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsCheckingSession(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-      },
-    );
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  useEffect(
-    function () {
-      if (!session) return;
-
-      async function getFacts() {
-        setIsLoading(true);
-
-        let query = `${SUPABASE_URL}?select=*`;
-        if (currentCategory !== "all") {
-          query += `&category=eq.${currentCategory}`;
-        }
-
-        const res = await fetch(query, {
-          headers: {
-            apikey: SUPABASE_KEY,
-            authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        });
-        const data = await res.json();
-
-        setFacts(data);
-        setIsLoading(false);
-      }
-      getFacts();
-    },
-    [currentCategory, session],
-  );
-
-  if (isCheckingSession) return <p className="message">Loading...</p>;
-  if (!session) return <Login />;
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
 
   return (
     <>
-      <Header showForm={showForm} setShowForm={setShowForm} session={session} />
-
-      {showForm ? (
-        <NewFactForm setFacts={setFacts} setShowForm={setShowForm} />
-      ) : null}
-
-      <main className="main">
-        <CategoryFilter setCurrentCategory={setCurrentCategory} />
-        {isLoading ? (
-          <p className="message">Loading...</p>
-        ) : (
-          <FactList facts={facts} setFacts={setFacts} />
-        )}
-      </main>
+      <Header />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/courses" element={<Courses />} />
+        <Route path="/courses/:id" element={<Course />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/panel" element={<Panel />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="*" element={<main className="wrap"><h2>صفحه پیدا نشد</h2></main>} />
+      </Routes>
+      <Footer />
+      <MediaModal />
+      <Toast />
     </>
-  );
+  )
 }
-
-export default App;
